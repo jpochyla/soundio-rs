@@ -21,21 +21,21 @@ use std::os::raw::{c_char, c_int};
 /// ```
 /// let mut ctx = soundio::Context::new();
 /// ```
-pub struct Context<'a> {
+pub struct Context {
     /// The soundio library instance.
     soundio: *mut raw::SoundIo,
     /// The app name, used by some backends.
     app_name: String,
     /// The optional callbacks. They are boxed so that we can take a raw pointer
     /// to the heap object and give use it as `void* userdata`.
-    userdata: Box<ContextUserData<'a>>,
+    userdata: Box<ContextUserData>,
 }
 
 // The callbacks required for a context are stored in this object.
-pub struct ContextUserData<'a> {
-    backend_disconnect_callback: Option<Box<dyn FnMut(Error) + 'a>>,
-    devices_change_callback: Option<Box<dyn FnMut() + 'a>>,
-    events_signal_callback: Option<Box<dyn FnMut() + 'a>>,
+pub struct ContextUserData {
+    backend_disconnect_callback: Option<Box<dyn FnMut(Error)>>,
+    devices_change_callback: Option<Box<dyn FnMut()>>,
+    events_signal_callback: Option<Box<dyn FnMut()>>,
 }
 
 // See `Context::new_with_callbacks()`.
@@ -91,7 +91,7 @@ extern "C" fn on_events_signal(sio: *mut raw::SoundIo) {
 #[allow(dead_code)]
 extern "C" fn emit_rtprio_warning() {}
 
-impl<'a> Context<'a> {
+impl Context {
     /// Create a new libsoundio context.
     ///
     /// This panics if libsoundio fails to create the context object. This only happens due to out-of-memory conditions
@@ -104,7 +104,7 @@ impl<'a> Context<'a> {
     /// ```
     /// let mut ctx = soundio::Context::new();
     /// ```
-    pub fn new() -> Context<'a> {
+    pub fn new() -> Context {
         let soundio = unsafe { raw::soundio_create() };
         if soundio.is_null() {
             panic!("soundio_create() failed (out of memory).");
@@ -190,11 +190,11 @@ impl<'a> Context<'a> {
         backend_disconnect_callback: Option<BackendDisconnectCB>,
         devices_change_callback: Option<DevicesChangeCB>,
         events_signal_callback: Option<EventsSignalCB>,
-    ) -> Context<'a>
+    ) -> Context
     where
-        BackendDisconnectCB: 'a + FnMut(Error),
-        DevicesChangeCB: 'a + FnMut(),
-        EventsSignalCB: 'a + FnMut(),
+        BackendDisconnectCB: FnMut(Error) + 'static,
+        DevicesChangeCB: FnMut() + 'static,
+        EventsSignalCB: FnMut() + 'static,
     {
         // A set of function like `fn set_XX_callback(&mut self, ...` might be a nicer interface
         // but I am unsure about the safety implications.
@@ -679,7 +679,7 @@ impl<'a> Context<'a> {
     }
 }
 
-impl<'a> Drop for Context<'a> {
+impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
             // This also disconnects if necessary.
@@ -690,8 +690,8 @@ impl<'a> Drop for Context<'a> {
 
 // This allows wakeup and wait_events to be called from other threads.
 // TODO: Find out exactly the thread-safety properties of libsoundio.
-unsafe impl<'a> Send for Context<'a> {}
-unsafe impl<'a> Sync for Context<'a> {}
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
 
 #[cfg(test)]
 mod tests {
