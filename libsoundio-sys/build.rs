@@ -97,6 +97,11 @@ fn main() {
         dst.join("lib").display()
     );
 
+    println!(
+        "cargo:rustc-link-search=native={}",
+        dst.join("lib64").display()
+    );
+
     // Windows...
     if target.contains("windows") {
         // We need to link ole32 on Windows.
