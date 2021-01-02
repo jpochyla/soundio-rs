@@ -104,7 +104,7 @@ fn main() {
     }
 
     // Link soundio.
-    println!("cargo:rustc-link-lib=static=soundio");
+    println!("cargo:rustc-link-lib=soundio");
 
     // OSX
     if target.contains("apple") {
