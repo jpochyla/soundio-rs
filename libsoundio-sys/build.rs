@@ -34,6 +34,9 @@ fn main() {
             "Can't run pkg-config"
         );
         return;
+    } else if env::var("LIBSOUNDIO_SYS_USE_SYSTEM").is_ok() {
+        println!("cargo:rustc-link-lib=dylib=soundio");
+        return;
     }
 
     // If the libsoundio git submodule hasn't been initialised, do so.
