@@ -24,6 +24,9 @@ fn main() {
     // First check whether a pkg-config command is installed in the path.
     let has_pkgconfig = Command::new("pkg-config").output().is_ok();
 
+    let target = env::var("TARGET").unwrap();
+    let host = env::var("HOST").unwrap();
+
     // If the environment variable LIBSOUNDIO_SYS_USE_PKG_CONFIG exists
     // and there is a libsoundio system library use that. I wouldn't recommend
     // this option.
@@ -43,11 +46,11 @@ fn main() {
             .status();
     }
 
-    let target = env::var("TARGET").unwrap();
-    let host = env::var("HOST").unwrap();
-
     // Is the target Windows?
     let windows = target.contains("windows");
+
+    // Build soundio as a static library
+    let build_static_library = cfg!(feature="static-soundio");
 
     // Create a new cmake config.
     let mut cfg = cmake::Config::new("libsoundio");
@@ -84,10 +87,10 @@ fn main() {
     // And then create an empty output directory.
     t!(fs::create_dir_all(env::var("OUT_DIR").unwrap()));
 
-    // Don't bother with shared libs.
+    // Build either shared or static libs.
     let dst = cfg
-        .define("BUILD_DYNAMIC_LIBS", "OFF")
-        .define("BUILD_STATIC_LIBS", "ON")
+        .define("BUILD_DYNAMIC_LIBS", if build_static_library { "OFF" } else { "ON" })
+        .define("BUILD_STATIC_LIBS", if build_static_library { "ON" } else { "OFF" })
         .define("BUILD_EXAMPLE_PROGRAMS", "OFF")
         .define("BUILD_TESTS", "OFF")
         .build();
@@ -97,19 +100,34 @@ fn main() {
         dst.join("lib").display()
     );
 
+    println!(
+        "cargo:rustc-link-search=native={}",
+        dst.join("lib64").display()
+    );
+
     // Windows...
     if target.contains("windows") {
         // We need to link ole32 on Windows.
         println!("cargo:rustc-link-lib=ole32");
     }
 
-    // Link soundio.
-    println!("cargo:rustc-link-lib=static=soundio");
-
     // OSX
     if target.contains("apple") {
         println!("cargo:rustc-link-lib=framework=AudioToolbox");
         println!("cargo:rustc-link-lib=framework=CoreAudio");
         println!("cargo:rustc-link-lib=framework=CoreFoundation");
+    }
+
+    // Linux
+    if target.contains("linux") {
+        println!("cargo:rustc-link-lib=dylib=asound");
+        println!("cargo:rustc-link-lib=dylib=pulse");
+    }
+
+    // Link soundio.
+    if build_static_library {
+        println!("cargo:rustc-link-lib=static=soundio");
+    } else {
+        println!("cargo:rustc-link-lib=dylib=soundio");
     }
 }
